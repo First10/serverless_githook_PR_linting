@@ -21,7 +21,6 @@ exports.handler = async (event, context, callback) => {
 
 
     deploymentTools.closeTask();
-  }
 }
 else {
   const response = {

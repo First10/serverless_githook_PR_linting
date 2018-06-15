@@ -260,39 +260,52 @@ module.exports = class DeploymentTools {
     var _this = this;
 
     let count = 0;
+    const fileTypes = ['js', 'sass', 'scss', 'json'];
+
     return new Promise((resolveSort, reject) => {
       fileList.forEach((() => {
         var _ref = _asyncToGenerator(function* (file, index) {
           const fileNameParts = file.filename.split('.');
           const pathParts = file.filename.split('/');
           const type = fileNameParts[fileNameParts.length - 1];
-          let fileInfo = {
-            filename: pathParts[pathParts.length - 1],
-            contents_url: file.contents_url
-          };
 
-          if (typeof _this.files[type] === 'undefined') {
-            // Creating file type arrays.
-            _this.files[type] = [];
+          // Exclude files we're not interested in and don't process bundles.
+          if (fileTypes.indexOf(type) !== -1 && file.filename.indexOf('.bundle.') === -1) {
+
+            let fileInfo = {
+              filename: pathParts[pathParts.length - 1],
+              contents_url: file.contents_url
+            };
+
+            if (typeof _this.files[type] === 'undefined') {
+              // Creating file type arrays.
+              _this.files[type] = [];
+            }
+
+            let info = yield _this.getFilesFromGit(file.contents_url, 'raw');
+            info = JSON.parse(info);
+
+            fileInfo.download_url = info.download_url;
+
+            // Convert the encoded content from base 64 back into utf8.
+            let content = new Buffer(info.content, 'base64');
+
+            // Remove comments form the linting.
+            // ToDo: Improve comment linting.
+            fileInfo.content = content.toString('utf8').replace(/(\/\/\/.*)|\n$/gm, '');;
+
+            console.log('FILE CONTENT', fileInfo.content);
+
+            _this.files[type].push(fileInfo);
+
+            // Write the file to the local tmp folder.
+            // fs.writeFile(`/tmp/${fileInfo.filename}`, content, 'base64', function(err) {
+            //   if (err) console.log('File writing error: ', err);
+            // });
+            // console.log(`Wrote /tmp/${fileInfo.filename}`);
+          } else {
+            console.log('Ignoreing type: ', type);
           }
-
-          let info = yield _this.getFilesFromGit(file.contents_url, 'raw');
-          info = JSON.parse(info);
-
-          fileInfo.download_url = info.download_url;
-
-          // Convert the encoded content from base 64 back into utf8.
-          let content = new Buffer(info.content, 'base64');
-
-          fileInfo.content = content.toString('utf8').replace(/\n/, ' \n ');
-
-          _this.files[type].push(fileInfo);
-
-          // Write the file to the local tmp folder.
-          // fs.writeFile(`/tmp/${fileInfo.filename}`, content, 'base64', function(err) {
-          //   if (err) console.log('File writing error: ', err);
-          // });
-          // console.log(`Wrote /tmp/${fileInfo.filename}`);
 
           count++;
 
@@ -344,6 +357,7 @@ module.exports = class DeploymentTools {
     return Promise.all(lintJobs).then(values => {
 
       values.forEach(value => {
+        console.log('Values: ', values);
         let type = value.type;
 
         report[type] = typeof report[type] === 'object' ? report[type] : {};
@@ -394,7 +408,7 @@ module.exports = class DeploymentTools {
         switch (type) {
           case 'sass':
           case 'scss':
-            results = yield _this3.lintCSS(file);
+            results = yield _this3.lintSCSS(file);
             break;
 
           case 'json':
@@ -407,7 +421,6 @@ module.exports = class DeploymentTools {
 
           default:
             rejectlintSwitch(new Error('Unknown file type: ' + type));
-
         }
 
         return resolvelintSwitch({
@@ -444,7 +457,7 @@ module.exports = class DeploymentTools {
    *
    * @returns {Promise<T>}
    */
-  lintCSS(file) {
+  lintSCSS(file) {
     const stylelint = require('stylelint');
     // ToDo: Replace the below with the project rules.
     let rules = require('../.stylelintrc');
@@ -456,25 +469,21 @@ module.exports = class DeploymentTools {
       let warnings = [];
       let errors = [];
 
-      if (data.errored) {
-        data.results.forEach(result => {
+      data.results.forEach(result => {
 
-          result.warnings.forEach(warning => {
-            switch (warning.severity) {
-              case 'error':
-                errors.push(warning);
-                break;
-              case 'warning':
-                warnings.push(warning);
-                break;
-            }
-          });
+        result.warnings.forEach(warning => {
+          switch (warning.severity) {
+            case 'error':
+              errors.push(warning);
+              break;
+            case 'warning':
+              warnings.push(warning);
+              break;
+          }
         });
+      });
 
-        return { warnings, errors, filename: file.filename };
-      } else {
-        return null;
-      }
+      return { warnings, errors, filename: file.filename };
     }).catch(function (err) {
       // do things with err e.g.
       console.error(err.stack);

@@ -34,7 +34,7 @@ exports.handler = async (event, context, callback) => {
         await deploymentTools.setStatus({
           state: 'pending',
           target_url: `https://example.com/build/${type}/status`,
-          context: `serverless/${type}`,
+          context: `serverless - ${type}`,
           description: `Running linting checks on ${filesInfo[type].length} ${type} files`
         });
       }
@@ -57,7 +57,7 @@ exports.handler = async (event, context, callback) => {
               if (errors > 0) {
                 await deploymentTools.setStatus({
                   state: 'failure',
-                  context: `serverless/${type}`,
+                  context: `serverless - ${type}`,
                   target_url: `https://example.com/build/${type}/status`,
                   description: `Finished linting ${type} files. Errors: ${errors}. Warnings: ${warnings}`
                 });
@@ -66,7 +66,7 @@ exports.handler = async (event, context, callback) => {
               else if (warnings > 0) {
                 await deploymentTools.setStatus({
                   state: 'success',
-                  context: `serverless/${type}`,
+                  context: `serverless - ${type}`,
                   target_url: `https://example.com/build/${type}/status`,
                   description: `Finished linting ${type} files. Warnings: ${warnings}`
                 });
@@ -74,7 +74,7 @@ exports.handler = async (event, context, callback) => {
               else {
                 await deploymentTools.setStatus({
                   state: 'success',
-                  context: `serverless/${type}`,
+                  context: `serverless - ${type}`,
                   target_url: `https://example.com/build/${type}/status`,
                   description: `Finished linting ${type} files.`
                 });

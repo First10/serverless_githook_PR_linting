@@ -17,7 +17,11 @@
     "es6":     true,
     "browser": true,
     "WebFont": true,
-    "Promise": true
+    "Promise": true,
+    "module": true,
+    "global": true,
+    "__dirname": true,
+    "require": true
   },
   "parserOptions": {
     "ecmaVersion": 6,

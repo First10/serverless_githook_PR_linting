@@ -5,13 +5,16 @@
 
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
 
-const DeploymentTools = require('./index');
+const GithubConnection = require('./Github');
+const LinterHub = require('./Linter');
+const AwsConnection = require('./AWS');
 
 exports.handler = (() => {
   var _ref = _asyncToGenerator(function* (event, context, callback) {
     const bucketName = process.env.BUCKET;
     const gitHookKey = process.env.GITHUB_WEBHOOK_SECRET;
     const gitAPIkey = process.env.GITHUB_API_TOKEN;
+    const credentials = null;
 
     const config = {
       targetBranch: 'develop'
@@ -23,23 +26,28 @@ exports.handler = (() => {
     if (event.headers['X-GitHub-Event'] === 'pull_request' && (event.body.action === 'opened' || event.body.action === 'synchronize')) {
 
       console.log('Init DeploymentTools class');
-      const deploymentTools = new DeploymentTools(null, event, callback, bucketName, gitHookKey, gitAPIkey, 'dist', config.targetBranch);
+      const githubConnection = new GithubConnection(event, callback, gitAPIkey, gitHookKey, credentials, 'dist', config.targetBranch);
+      const linter = new LinterHub(credentials, event, githubConnection);
+      const aws = new AwsConnection(event, callback, credentials, [{
+        name: 's3',
+        bucketName: bucketName
+      }]);
 
       // Process incoming gitHook event.
-      if (deploymentTools.processIncommingGitHook()) {
-        const listOfFiles = yield deploymentTools.getUpdated();
+      if (githubConnection.processIncommingGitHook()) {
+        const listOfFiles = yield githubConnection.getUpdated();
 
         console.log('Sort into types');
         console.log('List of files', JSON.stringify(listOfFiles));
 
-        yield deploymentTools.sortIntoTypes(listOfFiles);
-        const filesInfo = deploymentTools.getFileInfo();
+        yield linter.sortIntoTypes(listOfFiles);
+        const filesInfo = linter.getFileInfo();
 
         console.log('File info: ', JSON.stringify(filesInfo));
 
         for (let type of Object.keys(filesInfo)) {
           // Set the PR ro pending while we run the checks.
-          yield deploymentTools.setStatus({
+          yield githubConnection.setStatus({
             state: 'pending',
             target_url: `https://example.com/build/${type}/status`,
             context: `serverless - ${type}`,
@@ -49,7 +57,7 @@ exports.handler = (() => {
 
         console.log('Attempt to lint!');
 
-        const lintResults = yield deploymentTools.lint();
+        const lintResults = yield linter.lint();
 
         console.log('Check them results!!!! ', JSON.stringify(lintResults));
 
@@ -64,21 +72,21 @@ exports.handler = (() => {
                 const errors = lintResults[type].errors.length || 0;
 
                 if (errors > 0) {
-                  yield deploymentTools.setStatus({
+                  yield githubConnection.setStatus({
                     state: 'failure',
                     context: `serverless - ${type}`,
                     target_url: `https://example.com/build/${type}/status`,
                     description: `Finished linting ${type} files. Errors: ${errors}. Warnings: ${warnings}`
                   });
                 } else if (warnings > 0) {
-                  yield deploymentTools.setStatus({
+                  yield githubConnection.setStatus({
                     state: 'success',
                     context: `serverless - ${type}`,
                     target_url: `https://example.com/build/${type}/status`,
                     description: `Finished linting ${type} files. Warnings: ${warnings}`
                   });
                 } else {
-                  yield deploymentTools.setStatus({
+                  yield githubConnection.setStatus({
                     state: 'success',
                     context: `serverless - ${type}`,
                     target_url: `https://example.com/build/${type}/status`,
@@ -92,24 +100,37 @@ exports.handler = (() => {
               return _ref2.apply(this, arguments);
             };
           })());
+
+          const params = aws.AWSs3.prepParams('put', JSON.stringify(lintResults), event.body.pull_request.title, 'json');
+
+          // Put the results on s3 as json.
+          aws.AWSs3.put(params);
         }
 
-        deploymentTools.closeTask();
+        // Success - report back to lambda
+        callback(null, {
+          statusCode: 200,
+          body: JSON.stringify({
+            input: event
+          })
+        });
       } else {
+        // If this is isn't a github event we're interested in return everything is fine.
         const response = {
           statusCode: 200,
           body: {
-            input: undefined.event
+            input: event
           }
         };
 
         return callback(null, JSON.stringify(response));
       }
     } else {
+      // If this is isn't a github event we're interested in return everything is fine.
       return callback(null, JSON.stringify({
         statusCode: 404,
         body: {
-          input: undefined.event,
+          input: event,
           message: `GitHub event: ${event.headers['X-GitHub-Event']}. Event type if any: ${event.body.action}`
         }
       }));

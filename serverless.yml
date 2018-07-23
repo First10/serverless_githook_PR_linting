@@ -13,27 +13,53 @@
 
 service: f10-linting
 
+plugins:
+  - serverless-finch
+  - serverless-build-client
+
 # You can pin your service to only deploy with a specific Serverless version
 # Check out our docs for more details
 # frameworkVersion: "=X.X.X"
 custom:
-  client: rcwdl
-  bucketName: ${self:custom.client}-assets--svl
+  clientName: rcwdl
+  bucketName: ${self:custom.clientName}-pr-reports
   auth: ${file(./env.yml):auths}
   GITHUB_WEBHOOK_SECRET: ${file(./env.yml):GITHUB_WEBHOOK_SECRET}
   GITHUB_API_TOKEN: ${file(./env.yml):GITHUB_API_TOKEN}
+# This is for finch the static site generator
+  client:
+      bucketName: ${self:custom.bucketName}
+      distributionFolder: './frontend/build'
+package:
+  exclude:
+    - "frontend/node_modules/**"
 
 provider:
   name: aws
-  timeout: 300
+  timeout: 30
   runtime: nodejs8.10
   region: eu-west-1
   profile: f10aws
   role: arn:aws:iam::547637678216:role/RC-Git-deployment
   package:
     individually: true
+    #excludeDevDependencies: false
     exclude:
       - ".*/**"
+      - "frontend"
+    include:
+      - "frontend/build"
+  environment:
+        bucket: ${self:custom.bucketName}
+        clientName: ${self:custom.clientName}
+        reportUrl: https://qqiyzb9w1d.execute-api.eu-west-1.amazonaws.com/dev
+  iamRoleStatements:
+        - Effect: "Allow"
+          Action:
+            - "s3:GetObject"
+          Resource:
+            - { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}
+            - arn:aws:s3:::${self:custom.bucketName}/*
 #  iamRoleStatements:
 #    - Effect: Allow
 #      Action:
@@ -60,7 +86,7 @@ provider:
 functions:
 
   GithubPRLint--RC:
-    handler: dist/githubPR-lint.handler
+    handler: dist/init.handler
     environment:
       auth: ${self:custom.auth} # This passes the values stored in you .env file into your lambda function.
       GITHUB_WEBHOOK_SECRET: ${self:custom.GITHUB_WEBHOOK_SECRET}
@@ -77,10 +103,28 @@ functions:
           path: /githooks
           method: post
           cors: true
-    package:
-      include:
-        - githubPR-lint.js
-        - node_modules/*
+  reportFetcher--RC:
+    handler: dist/reportFetcher.handler
+    environment:
+      auth: ${self:custom.auth} # This passes the values stored in you .env file into your lambda function.
+      BUCKET: ${self:custom.bucketName}
+    name: reportFetcher
+    description: Lambda function used to fetch reports generated from linting Pull Requests.
+    tags:
+      client: royal canin
+      application: lambda
+      project: design language
+    events:
+      - http:
+          path: /reports/get
+          method: post
+          cors: true
+resources:
+  Resources:
+    ReportBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details
@@ -119,3 +163,4 @@ functions:
 #       Description: "Description for the output"
 #       Value: "Some output value"
 #         rcGithubDeploymnet:
+

@@ -1,4 +1,4 @@
-import tools from 'utilities';
+import tools from './utilities';
 
 module.exports = class AwsS3 {
   constructor(AWS, service) {
@@ -14,10 +14,13 @@ module.exports = class AwsS3 {
   }
 
   get(params) {
-    return this.s3.getObject(params, function(err, data) {
-      if (err) console.log(err, err.stack); // an error occurred
-      else     console.log(data);           // successful response
-    });
+    return new Promise((yes, no) => {
+      this.s3.getObject(params, function (err, data) {
+        if (err) console.log(err, err.stack); // an error occurred
+        else console.log('GET DATA: ', data); // successful response
+        return yes(data)
+      });
+    })
   }
 
   list(params) {
@@ -40,9 +43,8 @@ module.exports = class AwsS3 {
         };
       case 'get':
         return {
-          Body: content,
           Bucket: this.bucketName,
-          Key: tools.formatGitName('reports/', name, outputType)
+          Key: 'reports/' + name
         };
       case 'list':
         return {

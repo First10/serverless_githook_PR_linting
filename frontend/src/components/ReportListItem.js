@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { Button } from 'reakit';
 
 class ReportListItem extends Component {
   constructor(props) {
@@ -9,12 +10,18 @@ class ReportListItem extends Component {
 
     this.state = {
       info: props.info,
-      branchName: props.info.Key.toString().split('/')[nameParts - 1]
+      reportName: props.info.Key.toString().split('/')[nameParts - 1]
     }
   }
 
+  reportButton() {
+
+  }
+
   render() {
-    return(<li className="mdc-list-item">{this.state.branchName}</li>)
+    return(<li className="mdc-list-item">{
+      <Button onClick={(e) => this.props.action(e, this.props.branch + '/' + this.state.reportName)}>{this.state.reportName}</Button>
+    }</li>)
   }
 }
 

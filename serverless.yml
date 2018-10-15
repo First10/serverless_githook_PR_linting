@@ -30,25 +30,20 @@ custom:
   client:
       bucketName: ${self:custom.bucketName}
       distributionFolder: './frontend/build'
+
 package:
+  individually: true
   exclude:
     - "frontend/node_modules/**"
 
 provider:
   name: aws
   timeout: 30
-  runtime: nodejs8.10
+  runtime: nodejs6.10
   region: eu-west-1
   profile: f10aws
   role: arn:aws:iam::547637678216:role/RC-Git-deployment
-  package:
-    individually: true
     #excludeDevDependencies: false
-    exclude:
-      - ".*/**"
-      - "frontend"
-    include:
-      - "frontend/build"
   environment:
         bucket: ${self:custom.bucketName}
         clientName: ${self:custom.clientName}
@@ -87,6 +82,13 @@ functions:
 
   GithubPRLint--RC:
     handler: dist/init.handler
+    package:
+      individually: true
+      exclude:
+        - "src"
+        - "frontend"
+      include:
+        - "dist"
     environment:
       auth: ${self:custom.auth} # This passes the values stored in you .env file into your lambda function.
       GITHUB_WEBHOOK_SECRET: ${self:custom.GITHUB_WEBHOOK_SECRET}
@@ -103,8 +105,17 @@ functions:
           path: /githooks
           method: post
           cors: true
+
   reportFetcher--RC:
     handler: dist/reportFetcher.handler
+    package:
+      individually: true
+      exclude:
+        - "src"
+        - "dist"
+        - "frontend/*"
+      include:
+        - "frontend/build"
     environment:
       auth: ${self:custom.auth} # This passes the values stored in you .env file into your lambda function.
       BUCKET: ${self:custom.bucketName}
@@ -119,6 +130,7 @@ functions:
           path: /reports/get
           method: post
           cors: true
+
 resources:
   Resources:
     ReportBucket:

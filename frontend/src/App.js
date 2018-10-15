@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
+import reports from './connectivity/reports';
 import './App.scss';
-import getData from './getData';
-import ReportListitem from './ReportListItem';
+import ReportListitem from './components/ReportListItem';
+import { List, Link } from "reakit";
 
 class App extends Component {
   constructor(props) {
@@ -11,81 +12,62 @@ class App extends Component {
     this.reportList = null;
     this.listReports();
 
-
     this.state = {
       reports: [],
       filters: 'Loading',
       reportList: '',
-      report: '',
+      report: null,
       branches: []
     };
 
+    this.getReport = this.getReport.bind(this);
+
   }
+
 
   listReports() {
-    getData({type: 'list'}).then((reports) => {
-      let filters = {
-        branch: []
-      };
-      let reportRows = [];
-      let reportsByBranch = {};
+    reports(this, 'list')
+      .then(data => {
+        let reportRows = [];
 
-      // Take the report objects and create a list of reports names with links.
+        // Render the organised data.
+        Object.keys(data.reportsByBranch).forEach((branch, key) => {
+          if (data.reportsByBranch[branch].length > 0) {
+            let groupBranch = [];
+            //
+            groupBranch.push(<h2>{branch}</h2>);
+            data.reportsByBranch[branch].forEach((report) => {
+              groupBranch.push(<ReportListitem action={this.getReport}
+                                               branch={branch}
+                                               key={branch + report.Key + 'report'}
+                                               info={report}/>);
 
-      console.log('reports: ', reports);
+            });
 
-        // Get all the branch names to use in the filters.
-      Object.keys(reports).forEach((report, key) => {
-        let branch = reports[report].Key.toString().split("/")[1];
-        filters.branch.push({
-          name: branch
+            reportRows.push(<List className="" >{groupBranch}</List>)
+          }
         });
 
-        // Put the reports into an object groups by branch.
-        reportsByBranch[branch] = reportsByBranch[branch] || [];
-        reportsByBranch[branch].push(reports[report]);
+        this.setState({
+          filters: {
+            branches: data.filter
+          },
+          reportList: reportRows,
+          reports: data.reports
+        });
+
+        this.createFilter();
       });
-
-      console.log('reportsByBranch', reportsByBranch);
-
-
-      // Render the organised data.
-      Object.keys(reportsByBranch).forEach((branch, key) => {
-        if (reportsByBranch[branch].length > 0) {
-          let groupBranch = [];
-          //
-          groupBranch.push(<h2>{branch}</h2>);
-          reportsByBranch[branch].forEach((report) => {
-            groupBranch.push(<ReportListitem key={this.state.branchName + 'report'} info={report}/>);
-          });
-
-          reportRows.push(<ul className="" key={branch}>{groupBranch}</ul>)
-        }
-      });
-
-
-      console.log('filters.branch', reportsByBranch);
-      console.log('reportRows', reportRows);
-
-      this.setState({
-        filters: {
-          branches: filters.branch
-        }
-      });
-      this.setState({reportList: reportRows});
-      this.setState({reports});
-      this.createFilter();
-
-    })
-      .catch(console.log);
   }
 
-  getReport() {
-    getData({type: 'get'}).then((report) => {
+  getReport(event, name) {
+    reports(this, 'get', name)
+      .then(data => {
+        this.setState({
+          report: data
+        });
 
-      this.setState({report});
-    })
-      .catch(console.log);
+      });
   }
 
   filterReports(field, value) {
@@ -112,14 +94,96 @@ class App extends Component {
       filters.push(<select key={filterData}>{options}</select>)
     });
 
-    console.log('filters: ', filters);
-
-
 
     this.setState({filters: {
-      markup: filters,
-      branches: this.state.branches
-    }});
+        markup: filters,
+        branches: this.state.branches
+      }});
+  }
+
+  formatitems(fileType, reportType, item) {
+    let markup = null;
+
+    switch (fileType) {
+      case 'js':
+        console.log('item', fileType);
+        markup = item[reportType].map((details) => {
+          return (
+            <li>
+              <h3>{details.message}</h3>
+              <List>
+                <li>Start line: {details.line}</li>
+                <li>End line: {details.endLine}</li>
+                <li>Code: {details.source}</li>
+              </List>
+
+            </li>
+          )
+        });
+        break;
+
+      case 'scss':
+        markup = item[reportType].map((details) => {
+          return (
+            <li>
+              <h3>{details.text}</h3>
+              <List>
+                <li>Start line: {details.line}</li>
+                <li>End line: {details.endLine}</li>
+                <li>Rule broken: {details.rule}</li>
+                <li>Rule link: <Link href={'https://stylelint.io/user-guide/rules/' + details.rule}>View rule</Link></li>
+              </List>
+
+            </li>
+          )
+        });
+        break;
+
+    }
+
+    return (
+      <React.Fragment>
+        <List>
+          {markup}
+        </List>
+      </React.Fragment>
+    );
+
+  }
+
+  renderReport(data) {
+    let reportParts = [];
+
+    Object.keys(data).forEach((fileType) => {
+      if (['scss', 'js'].includes(fileType)) {
+
+        Object.keys(data[fileType]).forEach((reportType) => {
+          if (data[fileType][reportType].length > 0) {
+            reportParts.push(<h3>{reportType}</h3>);
+            reportParts.push(
+              data[fileType][reportType].map((item) => {
+                return (
+                  <div>
+                    <h4>{item.filename}</h4>
+                    <div>{this.formatitems(fileType, reportType, item)}</div>
+                  </div>
+                )
+              })
+            )
+          }
+        })
+
+      }
+
+    });
+
+    return (
+      <React.Fragment>
+        <div>Total Errors: {data.info.totalErrors} / Total Warnings: {data.info.totalWarnings}</div>
+        {reportParts}
+      </React.Fragment>
+    )
+
   }
 
   render() {
@@ -134,8 +198,9 @@ class App extends Component {
         <div>
           { this.state.reportList }
         </div>
+        <hr />
         <div>
-          { this.state.report }
+          { this.state.report !== null ? this.renderReport(this.state.report) : ''}
         </div>
       </div>
     );

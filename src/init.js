@@ -1,6 +1,7 @@
 const GithubConnection = require('./Github');
 const LinterHub = require('./Linter');
 const AwsConnection = require('./AWS');
+const frontendUrl = 'rcwdl-pr-reports.s3-website-eu-west-1.amazonaws.com';
 
 exports.handler = async (event, context, callback) => {
   const bucketName = process.env.BUCKET;
@@ -43,7 +44,7 @@ exports.handler = async (event, context, callback) => {
         // Set the PR ro pending while we run the checks.
         await githubConnection.setStatus({
           state: 'pending',
-          target_url: `https://example.com/build/${type}/status`,
+          target_url: `${frontendUrl}/build/${type}/status`,
           context: `serverless - ${type}`,
           description: `Running linting checks on ${filesInfo[type].length} ${type} files`
         });
@@ -68,7 +69,7 @@ exports.handler = async (event, context, callback) => {
               await githubConnection.setStatus({
                 state: 'failure',
                 context: `serverless - ${type}`,
-                target_url: `https://example.com/build/${type}/status`,
+                target_url: `${frontendUrl}/build/${type}/status`,
                 description: `Finished linting ${type} files. Errors: ${errors}. Warnings: ${warnings}`
               });
             }
@@ -77,7 +78,7 @@ exports.handler = async (event, context, callback) => {
               await githubConnection.setStatus({
                 state: 'success',
                 context: `serverless - ${type}`,
-                target_url: `https://example.com/build/${type}/status`,
+                target_url: `${frontendUrl}/build/${type}/status`,
                 description: `Finished linting ${type} files. Warnings: ${warnings}`
               });
             }
@@ -85,7 +86,7 @@ exports.handler = async (event, context, callback) => {
               await githubConnection.setStatus({
                 state: 'success',
                 context: `serverless - ${type}`,
-                target_url: `https://example.com/build/${type}/status`,
+                target_url: `${frontendUrl}/build/${type}/status`,
                 description: `Finished linting ${type} files.`
               });
             }

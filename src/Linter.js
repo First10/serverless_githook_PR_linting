@@ -1,14 +1,40 @@
-const fs = require('fs');
 const Linter = require("eslint").Linter;
 const linter = new Linter();
+const npm = require('npm-programmatic');
+
 
 module.exports = class LinterHub {
-  constructor (credentials, event, gitConnection) {
+  constructor (credentials, event, sourceConnection) {
 
     this.event = event;
     this.files = {};
-    this.gitConnection = gitConnection;
+    this.sourceConnection = sourceConnection;
+    this.lintDependants = {};
 
+  }
+
+  /**
+   * Add dependancies for for each file type to lint.
+   *
+   * @param packages
+   * @param type
+   */
+  lintingDependancies(packages, type) {
+    this.lintDependants[type] = [
+      new Promise((yes, no) => {
+        npm.install(packages, {
+          cwd:'/'
+        })
+          .then(() => {
+            console.log('Installed dependencies', packages);
+            return yes('Loaded' + packages);
+          })
+          .catch((e) => {
+            console.log('Unable to install packages', packages, e);
+            no(e);
+          })
+      })
+    ];
   }
 
 
@@ -40,7 +66,7 @@ module.exports = class LinterHub {
             this.files[type] = [];
           }
 
-          let info = await this.gitConnection.getFilesFromGit(file.contents_url, 'raw');
+          let info = await this.sourceConnection.getFiles(file.contents_url);
           info = JSON.parse(info);
 
           fileInfo.download_url = info.download_url;
@@ -202,18 +228,29 @@ module.exports = class LinterHub {
 
 
 
-
   /**
    *
    * @returns {Promise<T>}
    */
-  lintSCSS(file) {
+  async lintSCSS(file) {
     const stylelint = require('stylelint');
-    // ToDo: Replace the below with the project rules.
-    let rules = require('../.stylelintrc');
+    // Reduce the config down to just the scss rules etc.
+    const config = this.lintConfig.reduce(config => config.type === 'scss');
+
+
+
+    delete config.type;
+    console.log('scss rules', config);
+    console.log('scss lintDependants', this.lintDependants.scss);
+
+    // Make sure the packages have been
+    await Promise.all(this.lintDependants.scss);
+
+    console.log('scss lintDependants', this.lintDependants.scss);
+
 
     return stylelint.lint({
-      config: rules,
+      config: config,
       code: file.content
     })
       .then(function(data) {
@@ -254,7 +291,7 @@ module.exports = class LinterHub {
     let warnings = [];
     let errors = [];
     // ToDo: Replace the below with the project rules.
-    const rules = require('../eslintrules');
+    const rules = this.lintConfig.reduce(config => config.type === 'js');
     const messages = linter.verify(file.content, rules, { filename: file.filename });
 
     messages.forEach(message => {
@@ -300,6 +337,72 @@ module.exports = class LinterHub {
       console.log(`child process exited with code ${code}`);
       return resolve();
     });
+  }
+
+  async getLintingConfig(sourceConnection, fileTypes) {
+    const developURL = sourceConnection.get('developURL');
+    const configMap = {
+      js: ['.eslintrules.json', '.eslintrc.json'],
+      scss: ['.stylelintrc.json']
+    };
+    let configRequests = [];
+    let config = [];
+
+    fileTypes.forEach(type => {
+      // Try looking for each of the different types of linting rule file names.
+      configMap[type].forEach(set => {
+        configRequests.push(this.sourceConnection.getFiles(`${developURL}${set}`)
+        // Catch any errors caused by fetching the rule files.
+        .catch(err => console.log(err))
+        )
+      })
+    });
+
+
+    await Promise.all(configRequests);
+
+    configRequests.map((item, index) => {
+      // Remove any missing rule sets.
+      if (String(item).indexOf('404: Not Found') !== -1) return;
+      let rules = null;
+      if (typeof item === 'string') {
+        try {
+          rules = JSON.parse(item);
+        }
+        catch (err) {
+          throw new Error(`Failed to parse json rule set. Error: ${err}.`);
+        }
+      }
+      else {
+        rules = item;
+      }
+
+      config.push({
+        type: fileTypes[index],
+        rules: rules
+      });
+    });
+
+    config.forEach((item) => {
+
+        switch (item.type) {
+
+          case 'scss':
+            console.log('Loading scss dependencies', item.rules.plugins);
+            this.lintingDependancies(item.rules.plugins, 'scss');
+            break;
+
+          default:
+            console.log('Unknown linting config: ', item);
+
+      }
+
+    });
+
+    console.log('Loaded config', config);
+
+    this.lintConfig = config;
+
   }
 
 };

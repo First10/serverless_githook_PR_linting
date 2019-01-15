@@ -9,18 +9,26 @@ export default async (that, type, name) => {
         let filters = {
           branch: []
         };
+        let dedupeCheck = [];
         let reportsByBranch = {};
 
         // Take the report objects and create a list of reports names with links.
 
-        console.log('reports: ', reports);
-
         // Get all the branch names to use in the filters.
         Object.keys(reports).forEach((report, key) => {
-          let branch = reports[report].Key.toString().split("/")[1];
-          filters.branch.push({
-            name: branch
-          });
+          let branch = reports[report].Key
+            .toString()
+            .replace(/reports\/|Feature\/|feature\//g, '')
+            .split('/')[0];
+
+          if(!dedupeCheck.includes(branch)) {
+            filters.branch.push({
+              name: branch
+            });
+
+            dedupeCheck.push(branch);
+          }
+
 
           // Put the reports into an object groups by branch.
           reportsByBranch[branch] = reportsByBranch[branch] || [];
@@ -28,7 +36,7 @@ export default async (that, type, name) => {
         });
 
         return {
-          filter: filters.branch,
+          branchNames: filters.branch,
           reportsByBranch,
           reports
         };
@@ -43,7 +51,6 @@ export default async (that, type, name) => {
           return report
         })
         .catch(console.log);
-      break;
 
     default:
       throw new Error('Unknown type: ' + type);

@@ -36,6 +36,9 @@ module.exports = class AwsS3 {
 
     switch (paraType) {
       case 'put':
+        // Remove the features key from the name.
+        name = name.replace(/feature\//i, '');
+
         return {
           Body: content,
           Bucket: this.bucketName,
@@ -44,7 +47,7 @@ module.exports = class AwsS3 {
       case 'get':
         return {
           Bucket: this.bucketName,
-          Key: 'reports/' + name
+          Key: name
         };
       case 'list':
         return {

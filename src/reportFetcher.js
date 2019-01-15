@@ -37,7 +37,6 @@ exports.handler = (event, context, callback) => {
   }
 
   request.then((res) => {
-    console.log('end promise', );
     let response = null;
 
     switch (queryParams.type) {
@@ -52,7 +51,6 @@ exports.handler = (event, context, callback) => {
         throw new Error('Unknown type: ' + queryParams.type);
     }
 
-    console.log('response: ', response);
     // Success - report back to lambda
     callback(null, {
       statusCode: 200,

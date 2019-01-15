@@ -6,7 +6,15 @@ function formatGitName(prefix,  name, outputType) {
 
 }
 
+const reportFormatter = function (obj) {
+  let result = '';
+  Object.keys(obj).forEach((item) => result = result.concat(`[ ${item}: errors: ${obj[item].errors} / warrnings: ${obj[item].warnings} ] `) );
 
-export default {
-  formatGitName
-}
+  return result;
+};
+
+
+module.exports = {
+  formatGitName,
+  reportFormatter
+};

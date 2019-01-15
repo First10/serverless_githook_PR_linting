@@ -3,17 +3,16 @@ const request = require('request');
 const octokit = require('@octokit/rest')({debug: true});
 
 module.exports = class GithubConnection {
-  constructor(event, callback, gitAPIkey, gitHookKey, credentials, path, targetBranch) {
+  constructor(event, callback, GITHUB_API_TOKEN, GITHUB_WEBHOOK_SECRET, credentials, path, targetBranch) {
 
-    this.gitAPIkey = gitAPIkey;
+    this.gitAPIkey = GITHUB_API_TOKEN;
     this.event = event;
 
     this.credentials = credentials; // ToDo: To be used to talk to aws s3.
-    this.token = gitHookKey;
+    this.token = GITHUB_WEBHOOK_SECRET;
     this.PRBranchName = null;
     this.targetBranch = targetBranch; // ToDo: To be used to lock down merging to develop etc.
     this.PRno = event.body.number;
-    this.gitAPIkey = gitAPIkey;
 
     this.sha = event.body.pull_request.head.sha;
     this.octokit = octokit;
@@ -24,9 +23,15 @@ module.exports = class GithubConnection {
 
     this.owner = event.body.repository.full_name.split('/')[0];
     this.repo = event.body.repository.full_name.split('/')[1];
+    this.developURL = `https://raw.githubusercontent.com/${this.owner}/${this.repo}/develop/`;
+
 
     this.authenticateGit();
 
+  }
+
+  get(property) {
+    return this[property];
   }
 
   authenticateGit() {
@@ -186,11 +191,12 @@ module.exports = class GithubConnection {
   }
 
   /**
+   * Used to fetch individual files from github.
    *
-   * @param downloadsUrl
+   * @param url {String} Complete url to github raw file.
    * @returns {Promise<any>}
    */
-  getFilesFromGit(url, source) {
+  getFiles(url) {
     const target = {
       uri: url,
       headers: {
@@ -234,7 +240,7 @@ module.exports = class GithubConnection {
 
   /**
    *
-   * @param details
+   * @param details {Object} settings to configure status returned to github.
    */
   setStatus(details) {
 

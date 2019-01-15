@@ -1,112 +1,88 @@
 import React, { Component } from 'react';
 import reports from './connectivity/reports';
 import './App.scss';
-import ReportListitem from './components/ReportListItem';
+import ReportList from './components/ReportList';
+import Filters from './components/Filters';
 import { List, Link } from "reakit";
 
 class App extends Component {
   constructor(props) {
     super(props);
 
+
     this.filters = null;
     this.reportList = null;
-    this.listReports();
+    this.urlParams = new URLSearchParams(window.location.search);
+
+    const reportParam = this.urlParams.get('report');
 
     this.state = {
       reports: [],
-      filters: 'Loading',
+      filters: null,
       reportList: '',
+      activeReportSet: Array.isArray(reportParam) ? reportParam.split('/')[0] : null,
+      activeReport: Array.isArray(reportParam) ? reportParam.split('/')[1] : null,
       report: null,
       branches: []
     };
 
-    this.getReport = this.getReport.bind(this);
+    if (typeof this.urlParams.get('report') !== 'undefined') {
+      // Get the active report if we land on the page with a query string.
+      this.getReport(null, 'reports/' + this.urlParams.get('report'));
+    }
+
 
   }
 
+  componentDidMount() {
+    this.listReports();
+  }
 
-  listReports() {
+
+  listReports = () => {
     reports(this, 'list')
       .then(data => {
-        let reportRows = [];
 
-        // Render the organised data.
-        Object.keys(data.reportsByBranch).forEach((branch, key) => {
-          if (data.reportsByBranch[branch].length > 0) {
-            let groupBranch = [];
-            //
-            groupBranch.push(<h2>{branch}</h2>);
-            data.reportsByBranch[branch].forEach((report) => {
-              groupBranch.push(<ReportListitem action={this.getReport}
-                                               branch={branch}
-                                               key={branch + report.Key + 'report'}
-                                               info={report}/>);
-
-            });
-
-            reportRows.push(<List className="" >{groupBranch}</List>)
-          }
-        });
+        console.log('DATA', data);
 
         this.setState({
           filters: {
-            branches: data.filter
+            branches: data.branchNames
           },
-          reportList: reportRows,
           reports: data.reports
         });
 
-        this.createFilter();
       });
-  }
+  };
 
-  getReport(event, name) {
+
+  getReport = (event, name) => {
     reports(this, 'get', name)
       .then(data => {
         this.setState({
-          report: data
+          report: data,
+          activeReport: name
         });
 
       });
-  }
+  };
 
   filterReports(field, value) {
-    this.setState({reports: this.state.reports.filter(report => report[field] = value)});
+    //this.setState({reports: this.state.reports.filter(report => report[field] = value)});
   }
 
-  createFilter() {
-    let filters = [];
-
-    console.log('branches for filters', this.state.filters.branches);
-
-    Object.keys(this.state.filters).forEach((filterData) => {
-      let options = [];
-      let label = <label>{filterData}</label>;
-
-
-      this.state.filters[filterData].forEach((item) => {
-        options.push(<option key={item.name}>{item.name.toString()}</option>);
-      });
-
-      console.log('Filter name', options);
-
-      filters.push(label);
-      filters.push(<select key={filterData}>{options}</select>)
+  setCurrentReportGroup = (event) => {
+    this.setState({
+      activeReportSet: event.target.value
     });
+  };
 
 
-    this.setState({filters: {
-        markup: filters,
-        branches: this.state.branches
-      }});
-  }
-
-  formatitems(fileType, reportType, item) {
+  formatItems(fileType, reportType, item) {
     let markup = null;
 
     switch (fileType) {
       case 'js':
-        console.log('item', fileType);
         markup = item[reportType].map((details) => {
           return (
             <li>
@@ -165,7 +141,7 @@ class App extends Component {
                 return (
                   <div>
                     <h4>{item.filename}</h4>
-                    <div>{this.formatitems(fileType, reportType, item)}</div>
+                    <div>{this.formatItems(fileType, reportType, item)}</div>
                   </div>
                 )
               })
@@ -187,16 +163,26 @@ class App extends Component {
   }
 
   render() {
+    console.log('Setting active report set to: RENDER', this.state.activeReport);
     return (
       <div className="App">
         <header className="">
           <h1 className="page-title">Pull Request Reports</h1>
         </header>
         <nav>
-          { this.state.filters.markup }
+          <Filters
+            filters={this.state.filters}
+            activeReportSet={this.state.activeReportSet}
+            setCurrentReportGroup={this.setCurrentReportGroup}
+          />
         </nav>
         <div>
-          { this.state.reportList }
+          <ReportList
+            activeReportSet={this.state.activeReportSet}
+            activeReport={this.state.activeReport}
+            reports={this.state.reports}
+            action={this.getReport}
+          />
         </div>
         <hr />
         <div>

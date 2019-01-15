@@ -5,23 +5,15 @@ class ReportListItem extends Component {
   constructor(props) {
     super(props);
 
-    console.log(props);
-    const nameParts = props.info.Key.toString().split('/').length;
-
-    this.state = {
-      info: props.info,
-      reportName: props.info.Key.toString().split('/')[nameParts - 1]
-    }
-  }
-
-  reportButton() {
-
+    this.nameParts = props.info.Key.toString().split('/');
   }
 
   render() {
-    return(<li className="mdc-list-item">{
-      <Button onClick={(e) => this.props.action(e, this.props.branch + '/' + this.state.reportName)}>{this.state.reportName}</Button>
-    }</li>)
+    return(
+      <li className="mdc-list-item">{
+        <Button onClick={(e) => this.props.action(e, this.props.info.Key)}>{this.nameParts[2]}</Button>
+    }</li>
+    )
   }
 }
 

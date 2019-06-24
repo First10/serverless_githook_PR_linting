@@ -23,11 +23,11 @@ module.exports = class LinterHub {
     this.lintDependants[type] = [
       new Promise((yes, no) => {
         npm.install(packages, {
-          cwd:'/'
+          cwd:'/tmp'
         })
           .then(() => {
             console.log('Installed dependencies', packages);
-            return yes('Loaded' + packages);
+            return yes('Loaded: ' + packages);
           })
           .catch((e) => {
             console.log('Unable to install packages', packages, e);
@@ -198,12 +198,14 @@ module.exports = class LinterHub {
           rejectlintSwitch(new Error('Unknown file type: ' + type));
       }
 
-      return resolvelintSwitch({
+      return resolvelintSwitch(
+        {
         type: type,
         warnings: results.warnings,
         errors:results.errors,
         filename: file.filename
-      });
+        }
+      );
     });
   }
 
@@ -235,22 +237,23 @@ module.exports = class LinterHub {
   async lintSCSS(file) {
     const stylelint = require('stylelint');
     // Reduce the config down to just the scss rules etc.
-    const config = this.lintConfig.reduce(config => config.type === 'scss');
+    const config = this.lintConfig.filter(config => config.type === 'scss');
 
 
 
     delete config.type;
-    console.log('scss rules', config);
-    console.log('scss lintDependants', this.lintDependants.scss);
+    console.log('scss rules', JSON.stringify(config, null, 4));
 
     // Make sure the packages have been
-    await Promise.all(this.lintDependants.scss);
+    if (typeof this.lintDependants.scss !== 'undefined') {
+      await Promise.all(this.lintDependants.scss);
+    }
 
     console.log('scss lintDependants', this.lintDependants.scss);
 
 
     return stylelint.lint({
-      config: config,
+      config: config[0].rules, // ToDo: merge rules not just use the first.
       code: file.content
     })
       .then(function(data) {
@@ -264,6 +267,7 @@ module.exports = class LinterHub {
               case 'error':
                 errors.push(warning);
                 break;
+
               case 'warning':
                 warnings.push(warning);
                 break;
@@ -291,7 +295,7 @@ module.exports = class LinterHub {
     let warnings = [];
     let errors = [];
     // ToDo: Replace the below with the project rules.
-    const rules = this.lintConfig.reduce(config => config.type === 'js');
+    const rules = this.lintConfig.filter(config => config.type === 'js');
     const messages = linter.verify(file.content, rules, { filename: file.filename });
 
     messages.forEach(message => {
@@ -300,9 +304,11 @@ module.exports = class LinterHub {
         case 1:
           warnings.push(message);
           break;
+
         case 2:
           errors.push(message);
           break;
+
         default:
           throw new Error(`Unknown severity type ${message.severity} for file ${file.filename}`);
       }
@@ -314,9 +320,15 @@ module.exports = class LinterHub {
 
 
   /**
+   * Spawn a task, attach events to capture log outputs and attach the resolve to the end event.
+   * Promisesirses spawn tasks basically.
    *
-   * @param resolve
-   * @param binName
+   * @param {function} resolve
+   * Resolve callback function from Promise.
+   *
+   * @param {string} binName
+   * Binary path
+   *
    * @param fileContent
    * @param args
    */
@@ -359,14 +371,17 @@ module.exports = class LinterHub {
     });
 
 
-    await Promise.all(configRequests);
+    configRequests = await Promise.all(configRequests);
 
-    configRequests.map((item, index) => {
+    console.log('configRequests: ', configRequests);
+
+    configRequests.forEach((item, index) => {
       // Remove any missing rule sets.
       if (String(item).indexOf('404: Not Found') !== -1) return;
       let rules = null;
       if (typeof item === 'string') {
         try {
+          console.log('is a string ', typeof item, item);
           rules = JSON.parse(item);
         }
         catch (err) {
@@ -374,6 +389,7 @@ module.exports = class LinterHub {
         }
       }
       else {
+        console.log('not a string ', typeof item, item);
         rules = item;
       }
 
@@ -383,13 +399,15 @@ module.exports = class LinterHub {
       });
     });
 
-    config.forEach((item) => {
+    config.forEach(item => {
 
         switch (item.type) {
 
           case 'scss':
             console.log('Loading scss dependencies', item.rules.plugins);
-            this.lintingDependancies(item.rules.plugins, 'scss');
+            if (typeof item.rules.plugins !== 'undefined') {
+              this.lintingDependancies(item.rules.plugins, 'scss');
+            }
             break;
 
           default:

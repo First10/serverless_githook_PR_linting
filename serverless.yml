@@ -1,35 +1,19 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-service: f10-linting
+service: home-linting
 
 plugins:
   - serverless-finch
   - serverless-build-client
 
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
 custom:
-  clientName: rcwdl
+  clientName: home
   bucketName: ${self:custom.clientName}-pr-reports
   auth: ${file(./env.yml):auths}
   GITHUB_WEBHOOK_SECRET: ${file(./env.yml):GITHUB_WEBHOOK_SECRET}
   GITHUB_API_TOKEN: ${file(./env.yml):GITHUB_API_TOKEN}
-# This is for finch the static site generator
+  # This is for finch the static site generator
   client:
-      bucketName: ${self:custom.bucketName}
-      distributionFolder: './frontend/build'
+    bucketName: ${self:custom.bucketName}
+    distributionFolder: './frontend/build'
 
 package:
   individually: true
@@ -39,44 +23,22 @@ package:
 provider:
   name: aws
   timeout: 30
-  runtime: nodejs6.10
+  runtime: nodejs10.x
   region: eu-west-1
-  profile: f10aws
+  profile: HOME-TOOLS
   role: arn:aws:iam::547637678216:role/RC-Git-deployment
-    #excludeDevDependencies: false
+  #excludeDevDependencies: false
   environment:
-        bucket: ${self:custom.bucketName}
-        clientName: ${self:custom.clientName}
-        reportUrl: https://qqiyzb9w1d.execute-api.eu-west-1.amazonaws.com/dev
+    bucket: ${self:custom.bucketName}
+    clientName: ${self:custom.clientName}
+    reportUrl: https://qqiyzb9w1d.execute-api.eu-west-1.amazonaws.com/dev
   iamRoleStatements:
-        - Effect: "Allow"
-          Action:
-            - "s3:GetObject"
-          Resource:
-            - { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}
-            - arn:aws:s3:::${self:custom.bucketName}/*
-#  iamRoleStatements:
-#    - Effect: Allow
-#      Action:
-#        - s3:PutObject
-#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "RCWDL-assets-svl" } ] ] }
-
-# you can overwrite defaults here
-#  stage: dev
-#  region: us-east-1
-
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
-
-# you can add packaging information here
-#package:
-#  include:
-#    - include-me.js
-#    - include-me-dir/**
-#  exclude:
-#    - exclude-me.js
-#    - exclude-me-dir/**
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        - { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}
+        - arn:aws:s3:::${self:custom.bucketName}/*
 
 functions:
 
@@ -94,6 +56,7 @@ functions:
       GITHUB_WEBHOOK_SECRET: ${self:custom.GITHUB_WEBHOOK_SECRET}
       BUCKET: ${self:custom.bucketName}
       GITHUB_API_TOKEN: ${self:custom.GITHUB_API_TOKEN}
+      HOME: '/tmp'
     name: GithubPRLint
     description: Lambda function used lint Pull Requests.
     tags:
@@ -137,42 +100,9 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.bucketName}
-#    The following are a few example events you can configure
-#    NOTE: Please make sure to change your handler code to work with those events
-#    Check the event documentation for details
-#      - http:
-#          path: users/create
-#          method: get
-#      - s3: ${env:BUCKET}
-#      - schedule: rate(10 minutes)
-#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
-#      - alexaSkill
-#      - iot:
-#          sql: "SELECT * FROM 'some_topic'"
-#      - cloudwatchEvent:
-#          event:
-#            source:
-#              - "aws.ec2"
-#            detail-type:
-#              - "EC2 Instance State-change Notification"
-#            detail:
-#              state:
-#                - pending
-#      - cloudwatchLog: '/aws/lambda/hello'
-#      - cognitoUserPool:
-#          pool: MyUserPool
-#          trigger: PreSignUp
 
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-
-# you can add CloudFormation resource templates here
-
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
-#         rcGithubDeploymnet:
+Outputs:
+  AttachmentsBucketName:
+    Value:
+      Ref: ReportBucket
 

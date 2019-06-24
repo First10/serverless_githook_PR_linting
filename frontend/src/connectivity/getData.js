@@ -1,5 +1,5 @@
 // Get reports from API gateway
-let reportUrl = 'https://qqiyzb9w1d.execute-api.eu-west-1.amazonaws.com/dev/reports/get';
+let reportUrl = 'https://vucxbuzmw6.execute-api.eu-west-1.amazonaws.com/dev/reports/get';
 
 export default (options) => {
   const oReq = new XMLHttpRequest();

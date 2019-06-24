@@ -1,7 +1,7 @@
 const GithubConnection = require('./Github');
 const LinterHub = require('./Linter');
 const AwsConnection = require('./AWS');
-const frontendUrl = 'http://rcwdl-pr-reports.s3-website-eu-west-1.amazonaws.com/';
+const frontendUrl = 'https://home-pr-reports.s3-eu-west-1.amazonaws.com/';
 const { reportFormatter } = require('./utilities');
 const ls = require('ls');
 

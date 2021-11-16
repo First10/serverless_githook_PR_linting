@@ -20,7 +20,7 @@
   "homepage": "https://github.com/jmdrawneek/serverless_githook_PR_linting#readme",
   "dependencies": {
     "@octokit/rest": "^15.8.1",
-    "aws-sdk": "^2.268.1",
+    "aws-sdk": "^2.814.0",
     "babel-cli": "^6.26.0",
     "babel-eslint": "^8.2.2",
     "babel-plugin-add-header-comment": "^1.0.3",
